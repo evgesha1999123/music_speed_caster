@@ -42,15 +42,18 @@ class App(ctk.CTk):
         self.magic_button_pressed = False
 
         self.image_open_file = Image.open('icon_open_file.png')
-        self.photo_open_file = ImageTk.PhotoImage(self.image_open_file)
         self.image_play_button = Image.open('icon_play.png')
-        self.photo_play_button = ImageTk.PhotoImage(self.image_play_button)
         self.image_stop_button = Image.open('icon_stop.png')
-        self.photo_stop_button = ImageTk.PhotoImage(self.image_stop_button)
         self.image_pause_button = Image.open('icon_pause.png')
-        self.photo_pause_button = ImageTk.PhotoImage(self.image_pause_button)
         self.image_change_speed_button = Image.open('icon_magic.png')
+        self.image_settings = Image.open('icon_settings.png')
+
+        self.photo_open_file = ImageTk.PhotoImage(self.image_open_file)
+        self.photo_play_button = ImageTk.PhotoImage(self.image_play_button)
+        self.photo_stop_button = ImageTk.PhotoImage(self.image_stop_button)
+        self.photo_pause_button = ImageTk.PhotoImage(self.image_pause_button)
         self.photo_change_speed_button = ImageTk.PhotoImage(self.image_change_speed_button)
+        self.photo_settings_button = ImageTk.PhotoImage(self.image_settings)
 
         self.filename_label = ctk.CTkLabel(self, text = 'Waiting for opening file')
         self.filename_label.pack(side = tk.BOTTOM)
@@ -82,6 +85,11 @@ class App(ctk.CTk):
         self.volume_slider.place(relx = 0.5, rely = 0.7, anchor = CENTER)
         self.volume_slider.bind("<ButtonRelease-1>", self.volume_slider_event)
         self.volume_slider.set(1)
+
+        self.settings_button = ctk.CTkButton(self, width = 50, height = 50, text = None, 
+                                             image = self.photo_settings_button, command = self.settings_click_event)
+        self.settings_button.pack()
+        self.settings_button.place(relx = 0.1)
 
     def open_file(self):
         self._filepath_ = filedialog.askopenfilename(title="open .wav file", filetypes=[("audio", "*.mp3"), ("audio", "*.wav"), ("All files", "*.*")])
@@ -167,7 +175,23 @@ class App(ctk.CTk):
         self.alt_speed_thread = threading.Thread(target = self.change_speed, daemon = True)
         self.alt_speed_thread.start()
 
+    def settings_click_event(app):
+        settings_window = ctk.CTkToplevel(app)
+        settings_window.title('Настройки')
+        settings_window.geometry('600x300')
+
+    def close_window_event(self):
+        try:
+            if os.listdir('tmp/') != '':
+                os.remove('tmp/tmp_audiofile.mp3')
+            app.destroy()
+        except PermissionError:
+            app.destroy()
+        except FileNotFoundError:
+            app.destroy()
+
 # Define app and Create our app's mainloop
 if __name__ == "__main__":
     app = App()
+    app.protocol("WM_DELETE_WINDOW", app.close_window_event)
     app.mainloop()
