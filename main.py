@@ -41,6 +41,7 @@ class App(ctk.CTk):
         self.magic_button_pressed = False
         self.time_slider_button_release = False
         self.speed_multiplier = 0.8
+        self.current_track_progress = 0
 
         self.image_open_file = Image.open('icon_open_file.png')
         self.image_play_button = Image.open('icon_play.png')
@@ -234,11 +235,17 @@ class App(ctk.CTk):
         self.current_slider_pos = int(self.current_slider_pos)
         self.song_lenght_label.configure(text = self.current_slider_pos)
         mixer.music.set_pos(self.current_slider_pos)
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
         self.current_track_progress = mixer.music.get_pos()
         self.init_track_len_watcher_thread()
         self.is_play = True
         print(self.time_slider_button_release)
         
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 
 
     def volume_slider_event(self, event):
@@ -296,6 +303,7 @@ class App(ctk.CTk):
             app.destroy()
 
     def watch_track_progress(self):
+<<<<<<< Updated upstream
         while True:
                 if self.time_slider_button_release == True : break 
                 self.current_track_progress = mixer.music.get_pos()
@@ -309,6 +317,31 @@ class App(ctk.CTk):
                     self.time_slider.set(0)
                     self.stop_music()
                     break
+=======
+        print(self.is_play)
+        while self.is_play == True:
+                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.current_slider_pos}; self.current_track_progress {self.current_track_progress}')
+                    if self.time_slider_event(self):
+                        mixer.music.set_pos(self.current_slider_pos)
+                        self.time_slider_button_release = False
+                        self.current_track_progress = self.current_slider_pos
+                        break
+
+                    self.current_track_progress = self.current_track_progress / 1000
+                    self.current_track_progress = round(self.current_track_progress, 1)
+                    print(self.current_track_progress)
+                    self.time_slider.set(self.current_track_progress)
+                    self.song_lenght_label.configure(text = self.current_track_progress)
+                    if self.is_play == False : break
+                    if self.current_track_progress >= self.song_lenght :
+                        self.time_slider.set(0)
+                        self.stop_music()
+                        break
+>>>>>>> Stashed changes
+
+
+
+
 
 # Define app and Create our app's mainloop
 if __name__ == "__main__":

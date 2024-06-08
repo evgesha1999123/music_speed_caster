@@ -1,0 +1,10 @@
+/.git
+/__pycache__
+/build
+/dist
+/ffmpeg
+/Include
+/Lib
+/Music folder
+/output
+/release
