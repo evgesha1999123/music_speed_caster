@@ -183,7 +183,7 @@ class App(ctk.CTk):
             self.time_slider.place(relx = 0.5, rely = 0.5, anchor = CENTER)
             self.time_slider.configure(from_ = 0, to = self.song_lenght)
             self.time_slider.set(0)
-            self.song_lenght_label.configure(text = self.song_lenght)
+            self.song_lenght_label.configure(text = '0')
             self.song_lenght_label.pack()
             self.song_lenght_label.place(relx = 0.48, rely = 0.55)
             self.change_speed_button.configure(state = 'normal')
@@ -195,6 +195,7 @@ class App(ctk.CTk):
             self.is_play = False
             self.first_file_start = True
             self.time_slider.set(0)
+        self.song_lenght_label.configure(text = '0')
 
 
     def pause_and_play_button_click_event(self):
@@ -210,11 +211,10 @@ class App(ctk.CTk):
             if self.is_path_valid == True:
                 mixer.music.load(self._filepath_)
                 mixer.music.play()
-                self.init_track_len_watcher_thread()
-                print(f'VOLUME {mixer.music.get_volume()}')
                 self.pause_and_play_button.configure(image = self.photo_pause_button)
                 self.first_file_start = False
                 self.is_play = True
+                self.init_track_len_watcher_thread()
         else: 
             if self.is_play == True:
                 mixer.music.pause()
@@ -228,13 +228,17 @@ class App(ctk.CTk):
             
 
     def time_slider_event(self, event):
-        print(self.time_slider.get())
+        self.time_slider_button_release = True
+        self.is_play = False
         self.current_slider_pos = self.time_slider.get()
         self.current_slider_pos = int(self.current_slider_pos)
         self.song_lenght_label.configure(text = self.current_slider_pos)
-        self.time_slider_button_release = True
         mixer.music.set_pos(self.current_slider_pos)
-        self.track_len_watcher_thread.start()
+        self.current_track_progress = mixer.music.get_pos()
+        self.init_track_len_watcher_thread()
+        self.is_play = True
+        print(self.time_slider_button_release)
+        
 
 
     def volume_slider_event(self, event):
@@ -278,6 +282,7 @@ class App(ctk.CTk):
 
     def init_track_len_watcher_thread(self):
         self.track_len_watcher_thread = threading.Thread(target = self.watch_track_progress, daemon = True)
+        self.time_slider_button_release = False
         self.track_len_watcher_thread.start()
         
     def close_window_event(self):
@@ -291,25 +296,19 @@ class App(ctk.CTk):
             app.destroy()
 
     def watch_track_progress(self):
-        print(self.is_play)
-        while self.is_play == True:
-                current_track_progress = mixer.music.get_pos()
-                if self.time_slider_button_release == True: 
-                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.current_slider_pos}')
-                    mixer.music.set_pos(self.current_slider_pos)
-                    self.time_slider_button_release = False
+        while True:
+                if self.time_slider_button_release == True : break 
+                self.current_track_progress = mixer.music.get_pos()
+                self.current_track_progress = self.current_track_progress / 1000
+                self.current_track_progress = round(self.current_track_progress, 1)
+                self.time_slider.set(self.current_track_progress)
+                self.song_lenght_label.configure(text = self.current_track_progress)
+                if self.time_slider_button_release == True : break 
+                if self.is_play == False : break
+                if self.current_track_progress >= self.song_lenght :
+                    self.time_slider.set(0)
+                    self.stop_music()
                     break
-                else:
-                    current_track_progress = current_track_progress / 1000
-                    current_track_progress = round(current_track_progress, 1)
-                    print(current_track_progress)
-                    self.time_slider.set(current_track_progress)
-                    self.song_lenght_label.configure(text = current_track_progress)
-                    if self.is_play == False : break
-                    if current_track_progress >= self.song_lenght :
-                        self.time_slider.set(0)
-                        self.stop_music()
-                        break
 
 # Define app and Create our app's mainloop
 if __name__ == "__main__":
