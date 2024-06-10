@@ -21,6 +21,7 @@ print(">>>>>>>>>>>>>>>>>>>>>>>>>" + AudioSegment.ffmpeg)
 # Set the theme and color options
 ctk.set_appearance_mode("dark")  # Modes: system (default), light, dark
 ctk.set_default_color_theme("dark-blue")  # Themes: blue (default), dark-blue, green
+AUDIO_ALLOW_ANY_CHANGE:int
 
 is_path_valid = False
 
@@ -28,10 +29,9 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         #root = customtkinter.CTk()
-        pygame.init()
 
         self.title('Music speed caster')
-        self.geometry("400x220")
+        self.geometry("1300x800")
 
         self._filepath_ = ''
         self.current_song = None
@@ -46,6 +46,8 @@ class App(ctk.CTk):
         self.is_pause = False
         self.current_time = 0
 
+        self.ms_gothic_font = ctk.CTkFont(family = "@MS Gothic", size = 14)
+
         self.image_open_file = Image.open('resources/icon_open_file.png')
         self.image_play_button = Image.open('resources/icon_play.png')
         self.image_stop_button = Image.open('resources/icon_stop.png')
@@ -53,56 +55,96 @@ class App(ctk.CTk):
         self.image_change_speed_button = Image.open('resources/icon_magic.png')
         self.image_settings = Image.open('resources/icon_settings.png')
 
+        self.image_next_track = Image.open('resources/icon_next_track.png')
+        self.image_previous_track = Image.open('resources/icon_previous_track.png')
+        self.image_rewind_forward = Image.open('resources/icon_rewind_forward.png')
+        self.image_rewind_back = Image.open('resources/icon_rewind_back.png')
+
         self.photo_open_file = ImageTk.PhotoImage(self.image_open_file)
         self.photo_play_button = ImageTk.PhotoImage(self.image_play_button)
         self.photo_stop_button = ImageTk.PhotoImage(self.image_stop_button)
         self.photo_pause_button = ImageTk.PhotoImage(self.image_pause_button)
         self.photo_change_speed_button = ImageTk.PhotoImage(self.image_change_speed_button)
         self.photo_settings_button = ImageTk.PhotoImage(self.image_settings)
+        self.photo_next_track = ImageTk.PhotoImage(self.image_next_track)
+        self.photo_previous_track = ImageTk.PhotoImage(self.image_previous_track)
+        self.photo_rewind_forward = ImageTk.PhotoImage(self.image_rewind_forward)
+        self.photo_rewind_back = ImageTk.PhotoImage(self.image_rewind_back)
 
-        self.filename_label = ctk.CTkLabel(self, text = 'Waiting for opening file')
-        self.filename_label.pack(side = tk.BOTTOM)
+        self.pan_button_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'black', bg_color = 'black'); self.pan_button_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
-        self.song_lenght_label = ctk.CTkLabel(self)
+        self.pan_status_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'gold', border_color = 'black', border_width = 10); self.pan_status_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
-        self.open_file_button = ctk.CTkButton(self, text="load", 
-                                                        image = self.photo_open_file, command=self.open_file)
-        self.open_file_button.pack()
+        self.filename_label = ctk.CTkLabel(self.pan_status_frame, text = 'Waiting for opening file', text_color = 'black', font = self.ms_gothic_font)
+        self.filename_label.place(relx = 0.4, rely = 0.1)
 
-        self.pause_and_play_button = ctk.CTkButton(self, text = None, width = 50, height = 50, 
+        self.song_lenght_label = ctk.CTkLabel(self.pan_status_frame, text_color = 'black', font = self.ms_gothic_font)
+
+        self.open_file_button = ctk.CTkButton(self.pan_button_frame, text="Open", font = self.ms_gothic_font, text_color = 'black',
+                                               width = 50, height = 50, image = self.photo_open_file, command=self.open_file)
+        
+        self.open_file_button.place(relx = 0.88, rely = 0.35, anchor = W)
+
+        self.pause_and_play_button = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50, 
                                                              image = self.photo_play_button, command = self.pause_and_play_button_click_event)
-        self.pause_and_play_button.pack(side = tk.BOTTOM)
+        
         self.pause_and_play_button.place(relx = 0.35, rely = 0.35, anchor = W)
 
-        self.stop_button = ctk.CTkButton(self, text = None, width = 50, height = 50, 
+        self.stop_button = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50, 
                                                    image = self.photo_stop_button, command = self.stop_music)
-        self.stop_button.pack(side = tk.BOTTOM)
+
         self.stop_button.place(relx = 0.55, rely = 0.35, anchor = W)
 
-        self.change_speed_button = ctk.CTkButton(self, text = None, width = 50, height = 50,
+
+        self.button_rewind_forward = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,
+                                                    image = self.photo_rewind_forward, command = self.rewind_forward_click_event)
+        
+        self.button_rewind_forward.place(relx = 0.4, rely = 0.35, anchor = W)
+
+        self.button_rewind_back = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,
+                                                 image = self.photo_rewind_back, command = self.rewind_back_click_event)
+        
+        self.button_rewind_back.place(relx = 0.3, rely = 0.35, anchor = W)
+
+        self.button_next_track = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,
+                                                image = self.photo_next_track, command = self.next_track_click_event)
+        
+        self.button_next_track.place(relx = 0.45, rely = 0.35, anchor = W)
+
+        self.button_previous_track = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,
+                                                    image = self.photo_previous_track, command = self.previous_track_click_event)
+        
+        self.button_previous_track.place(relx = 0.25, rely = 0.35, anchor = W)
+
+
+        self.change_speed_button = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,
                                                 image = self.photo_change_speed_button, command = self.init_speed_changer_thread)
-        self.change_speed_button.pack(); self.change_speed_button.place(relx = 0.8, rely = 0)
+        
+        self.change_speed_button.place(relx = 0.8, rely = 0.35, anchor = W)
 
-        self.time_slider = ctk.CTkSlider(self, from_ = 0, to = self.song_lenght)
-        self.time_slider.bind("<B1-Motion>", self.time_slider_event_release)
+        self.time_slider = ctk.CTkSlider(self.pan_status_frame, from_ = 0, to = self.song_lenght, width = 1250, progress_color = 'DodgerBlue4')
+        self.time_slider.bind("<ButtonRelease-1>", self.time_slider_event_release)
 
-        self.volume_slider = ctk.CTkSlider(self, from_ = 0, to = 1, orientation = "horizontal"); self.volume_slider.pack()
-        self.volume_slider.place(relx = 0.5, rely = 0.7, anchor = CENTER)
+        self.volume_slider = ctk.CTkSlider(self.pan_button_frame, from_ = 0, to = 1, orientation = "horizontal", progress_color = 'DodgerBlue4')
+        self.volume_slider.place(relx = 0.6, rely = 0.5, anchor = W)
         self.volume_slider.bind("<ButtonRelease-1>", self.volume_slider_event)
         self.volume_slider.set(1)
 
+        self.info_label_volume = ctk.CTkLabel(self.pan_button_frame, font = self.ms_gothic_font, text = 'Volume:')
+        self.info_label_volume.place(relx = 0.605, rely = 0.2)
+
         self.settings_button = ctk.CTkButton(self, width = 50, height = 50, text = None, 
                                              image = self.photo_settings_button, command = self.settings_click_event)
-        self.settings_button.pack()
-        self.settings_button.place(relx = 0.1)
+        self.settings_button.place(relx = 0.01, rely = 0.01)
 
-        self.progressbar = ctk.CTkProgressBar(self, mode = "indeterminate")
+        self.progressbar = ctk.CTkProgressBar(self.pan_status_frame, mode = "indeterminate")
         
 
 
 #----------------------------------------------------------------------------Settings window
 
-
+    def on_touch_window(self):
+        print(f'{self.winfo_width()}:{self.winfo_height()}')
 
     def to_number(self, value):
         if re.match("^\d+?\.\d+?$", value) is None:
@@ -169,6 +211,21 @@ class App(ctk.CTk):
         else : return
 
 
+
+    def rewind_forward_click_event(self):
+        ...
+
+    def rewind_back_click_event(self):
+        ...
+
+    def next_track_click_event(self):
+        ...
+
+    def previous_track_click_event(self):
+        ...
+
+
+
     def open_file(self):
         self._filepath_ = filedialog.askopenfilename(title="open audiofile", filetypes=[("audio", "*.mp3"), ("audio", "*.wav"), ("All files", "*.*")])
         if self._filepath_ != '' : 
@@ -186,7 +243,7 @@ class App(ctk.CTk):
             self.time_slider.place(relx = 0.5, rely = 0.5, anchor = CENTER)
             self.time_slider.configure(from_ = 0, to = self.song_lenght)
             self.time_slider.set(0)
-            self.song_lenght_label.configure(text = '0')
+            self.song_lenght_label.configure(text = '00:00 / 00:00')
             self.song_lenght_label.pack()
             self.song_lenght_label.place(relx = 0.48, rely = 0.55)
             self.change_speed_button.configure(state = 'normal')
@@ -197,7 +254,7 @@ class App(ctk.CTk):
             self.pause_and_play_button.configure(image = self.photo_play_button)
             self.first_file_start = True
             self.is_stop = True
-            self.song_lenght_label.configure(text = '0')
+            self.song_lenght_label.configure(text = '00:00 / 00:00')
             self.current_time = 0
             self.time_slider.set(0)
 
@@ -239,7 +296,6 @@ class App(ctk.CTk):
         mixer.music.load(self._filepath_)
         mixer.music.play(loops = 0, start = int(self.time_slider.get()))
         self.current_time = int(self.time_slider.get())
-        self.watch_track_progress()
         
         
 
@@ -281,7 +337,7 @@ class App(ctk.CTk):
     def init_speed_changer_thread(self):
         self.alt_speed_thread = threading.Thread(target = self.change_speed, daemon = True)
         self.alt_speed_thread.start()
-        self.progressbar.place(relx = 0.25, rely = 0.8)
+        self.progressbar.place(relx = 0.8, rely = 0.2)
         self.progressbar.start()
 
     def close_window_event(self):
@@ -323,6 +379,7 @@ class App(ctk.CTk):
         
         self.song_lenght_label.configure(text = string_timebar)
         self.song_lenght_label.after(1000, self.watch_track_progress)
+        self.bind('<Configure>', self.on_touch_window())
 
                 
 
@@ -330,4 +387,8 @@ class App(ctk.CTk):
 if __name__ == "__main__":
     app = App()
     app.protocol("WM_DELETE_WINDOW", app.close_window_event)
+    pygame.init()
+    mixer.pre_init(frequency=44100, size = -16, channels=2, buffer=512, devicename=None, allowedchanges=0)
+    mixer.init(frequency=44100, size = -16, channels=2, buffer=512, devicename=None, allowedchanges=0)
+    print(pygame.mixer.get_init())
     app.mainloop()
