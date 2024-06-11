@@ -42,7 +42,7 @@ class App(ctk.CTk):
         self.magic_button_pressed = False
         self.time_slider_hold = False
         self.speed_multiplier = 0.8
-        self.is_stop = False
+        self.is_stop = True
         self.is_pause = False
         self.current_time = 0
 
@@ -54,7 +54,6 @@ class App(ctk.CTk):
         self.image_pause_button = Image.open('resources/icon_pause.png')
         self.image_change_speed_button = Image.open('resources/icon_magic.png')
         self.image_settings = Image.open('resources/icon_settings.png')
-
         self.image_next_track = Image.open('resources/icon_next_track.png')
         self.image_previous_track = Image.open('resources/icon_previous_track.png')
         self.image_rewind_forward = Image.open('resources/icon_rewind_forward.png')
@@ -73,7 +72,7 @@ class App(ctk.CTk):
 
         self.pan_button_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'black', bg_color = 'black'); self.pan_button_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
-        self.pan_status_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'gold', border_color = 'black', border_width = 10); self.pan_status_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
+        self.pan_status_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'dark orange', border_color = 'black', border_width = 10); self.pan_status_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
         self.filename_label = ctk.CTkLabel(self.pan_status_frame, text = 'Waiting for opening file', text_color = 'black', font = self.ms_gothic_font)
         self.filename_label.place(relx = 0.4, rely = 0.1)
@@ -131,7 +130,7 @@ class App(ctk.CTk):
         self.volume_slider.set(1)
 
         self.info_label_volume = ctk.CTkLabel(self.pan_button_frame, font = self.ms_gothic_font, text = 'Volume:')
-        self.info_label_volume.place(relx = 0.605, rely = 0.2)
+        self.info_label_volume.place(relx = 0.605, rely = 0.1)
 
         self.settings_button = ctk.CTkButton(self, width = 50, height = 50, text = None, 
                                              image = self.photo_settings_button, command = self.settings_click_event)
@@ -143,8 +142,7 @@ class App(ctk.CTk):
 
 #----------------------------------------------------------------------------Settings window
 
-    def on_touch_window(self):
-        print(f'{self.winfo_width()}:{self.winfo_height()}')
+
 
     def to_number(self, value):
         if re.match("^\d+?\.\d+?$", value) is None:
@@ -156,6 +154,7 @@ class App(ctk.CTk):
 
 
         self.settings_window = ctk.CTkToplevel(self)
+        self.settings_window.attributes("-topmost", True)
         self.settings_window.title('Настройки')
         self.settings_window.geometry('600x300')
 
@@ -190,6 +189,7 @@ class App(ctk.CTk):
 
     def button_save_config_event(self):
         self.speed_multiplier = self.speed_multiplier_label_value._text #<---set global value
+        self.settings_button.configure(state = 'normal')
         self.settings_window.destroy()
 
     def slider_set_track_speed_event(self, event):
@@ -213,10 +213,28 @@ class App(ctk.CTk):
 
 
     def rewind_forward_click_event(self):
-        ...
+        self.current_time = int(self.time_slider.get())
+        if self.current_time >= self.song_lenght or self.is_stop == True or self.is_pause == True : return
+        else :
+            mixer.music.play(loops = 0, start = int(self.time_slider.get()) + 1)
+            self.current_time += 3
+
+
 
     def rewind_back_click_event(self):
-        ...
+        self.current_time = int(self.time_slider.get())
+        if self.is_stop == True or self.is_pause == True or self.current_time <= 0 : return
+        else:
+            if self.current_time <= 3 :
+                mixer.music.play(loops = 0, start = - self.time_slider.get())
+                self.time_slider.set(0)
+                self.song_lenght_label.configure(text = f'00:00 / {time.strftime('%M:%S', time.gmtime(self.song_lenght))}')
+                
+            else:
+                mixer.music.play(loops = 0, start = int(self.time_slider.get()) - 3)
+                self.current_time -= 3
+
+
 
     def next_track_click_event(self):
         ...
@@ -248,8 +266,10 @@ class App(ctk.CTk):
             self.song_lenght_label.place(relx = 0.48, rely = 0.55)
             self.change_speed_button.configure(state = 'normal')
 
+            self.stop_music()
+
     def stop_music(self):
-        if self.is_stop == False: 
+        if self._filepath_ != None  and self._filepath_ != '': 
             mixer.music.stop()
             self.pause_and_play_button.configure(image = self.photo_play_button)
             self.first_file_start = True
@@ -272,30 +292,31 @@ class App(ctk.CTk):
 
         if self.first_file_start == True:
             if self.is_path_valid == True:
+                self.is_stop = False
+                self.is_pause = False
+                self.first_file_start = False
                 mixer.music.load(self._filepath_)
                 mixer.music.play()
-                self.is_stop = False
                 self.pause_and_play_button.configure(image = self.photo_pause_button)
-                self.first_file_start = False
                 self.watch_track_progress()
         else: 
             if self.is_pause == False:
                 mixer.music.pause()
                 self.pause_and_play_button.configure(image = self.photo_play_button)
                 self.is_pause = True
+                
             elif self.is_pause == True:
                 mixer.music.unpause()
                 self.pause_and_play_button.configure(image = self.photo_pause_button)
                 self.is_pause = False
-                self.watch_track_progress()
+                #self.watch_track_progress()
             
 
     def time_slider_event_release(self, event):
-        self.pause = False
-        self.stop = False
-        mixer.music.load(self._filepath_)
-        mixer.music.play(loops = 0, start = int(self.time_slider.get()))
-        self.current_time = int(self.time_slider.get())
+        if self.is_pause == False and self.is_stop == False:
+            mixer.music.load(self._filepath_)
+            mixer.music.play(loops = 0, start = int(self.time_slider.get()))
+            self.current_time = int(self.time_slider.get())
         
         
 
@@ -356,30 +377,33 @@ class App(ctk.CTk):
 
         player_time = mixer.music.get_pos() / 1000
 
-        current_time =  self.current_time + player_time
+        if player_time < 0 : 
+            self.stop_music() 
+            return
 
-        current_time += 1
+        current_time =  self.current_time + player_time
         
         converted_current_time = time.strftime('%M:%S', time.gmtime(current_time))
 
         converted_song_lenght = time.strftime('%M:%S', time.gmtime(self.song_lenght))
+
+        if int(current_time) >= int(self.song_lenght) : 
+                string_timebar = f'{converted_song_lenght} / {converted_song_lenght}'
+                self.song_lenght_label.configure(text = string_timebar)
+                self.stop_music()
+                return
+        
+        if current_time < self.song_lenght: current_time += 1
 
         string_timebar = f'{converted_current_time} / {converted_song_lenght}'
 
         self.time_slider.set(int(current_time))
 
         print(f'get_pos = {player_time} GLOBAL self.current_time = {self.current_time}')
-        print(f'current time {current_time}')
+        print(f'{int(current_time)} {int(self.song_lenght)}')
 
-        if int(current_time) == int(self.song_lenght) : 
-            string_timebar = f'{converted_song_lenght} / {converted_song_lenght}'
-            self.song_lenght_label.configure(text = string_timebar)
-            self.time_slider.set(self.song_lenght)
-            return
-        
         self.song_lenght_label.configure(text = string_timebar)
         self.song_lenght_label.after(1000, self.watch_track_progress)
-        self.bind('<Configure>', self.on_touch_window())
 
                 
 
