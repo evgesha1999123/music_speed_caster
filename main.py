@@ -258,14 +258,16 @@ class App(ctk.CTk):
 
 
     def next_track_click_event(self):
-        selected_element = self.playlist_list[self.playlist.curselection()]
-        if selected_element == self.playlist.size() : return
-        else : 
-            self.stop_music()
-            self.pause_and_play_button_click_event()
+        if self.playlist.curselection() == self.playlist.size() - 1 : return
+        else:
+            self._filepath_ = self.playlist_list[self.playlist.curselection() + 1]
+            self.playlist.activate(self.playlist.curselection() + 1)
 
     def previous_track_click_event(self):
-        ...
+        if self.playlist.curselection() == 0 : return
+        else:
+            self._filepath_ = self.playlist_list[self.playlist.curselection() - 1]
+            self.playlist.activate(self.playlist.curselection() - 1)
 
 
     def parse_title_image_from_file(self):
@@ -294,7 +296,6 @@ class App(ctk.CTk):
             self.img = self.img.resize((400, 400), )
 
             self.title_image = ImageTk.PhotoImage(image = self.img)
-
             self.canvas.configure(image = self.title_image)
 
 
