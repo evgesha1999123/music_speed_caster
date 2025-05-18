@@ -1,10 +1,5 @@
-.git/*
-AAA/*
-dist/*
-build/*
-build.py
-check.py
-launch.bat
-main.spec
-obeme.py
-.\pyvenv.cfg
+__pycache__/
+.YMcache/
+venv/
+.env
+.gitignore

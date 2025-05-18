@@ -17,6 +17,10 @@ import time
 from mutagen.mp3 import MP3
 from CTkListbox import *
 import eyed3
+from pathlib import Path
+import music_downloader
+from concurrent.futures import ThreadPoolExecutor
+
 
 # Set the theme and color options
 ctk.set_appearance_mode("dark")  # Modes: system (default), light, dark
@@ -28,10 +32,10 @@ is_path_valid = False
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        #root = customtkinter.CTk()
 
         self.title('Music speed caster')
         self.geometry("1300x800")
+        self.resizable(False, False)
 
         self._filepath_ = ''
         self.current_song = None
@@ -64,6 +68,9 @@ class App(ctk.CTk):
         self.image_show_playlist = Image.open('resources/icon_show_playlist.png')
         self.image_hide_playlist = Image.open('resources/icon_hide_playlist.png')
         self.image_unknown_almub = Image.open('resources/unknown_album.png')
+        self.image_add_track_to_playlist = Image.open('resources/icon_add_track_to_playlist.png')
+        self.image_clear_playlist = Image.open('resources/icon_clear_playlist.png')
+        self.image_download_tracks = Image.open('resources/icon_download.png')
 
         self.photo_open_file = ImageTk.PhotoImage(self.image_open_file)
         self.photo_play_button = ImageTk.PhotoImage(self.image_play_button)
@@ -77,18 +84,21 @@ class App(ctk.CTk):
         self.photo_rewind_back = ImageTk.PhotoImage(self.image_rewind_back)
         self.photo_show_playlist = ImageTk.PhotoImage(self.image_show_playlist)
         self.photo_hide_playlist = ImageTk.PhotoImage(self.image_hide_playlist)
+        self.photo_add_track_to_playlist = ImageTk.PhotoImage(self.image_add_track_to_playlist)
+        self.photo_clear_playlist = ImageTk.PhotoImage(self.image_clear_playlist)
+        self.photo_download_tracks = ImageTk.PhotoImage(self.image_download_tracks)
 
 
         self.img = self.image_unknown_almub.resize((400, 400), )
 
-        self.title_image = ImageTk.PhotoImage(image = self.img)
+        self.title_image = ImageTk.PhotoImage(image=self.img)
 
-        self.canvas = ctk.CTkLabel(self, text = None, fg_color = 'gray', image = self.title_image); self.canvas.place(relx = 0.4, rely = 0.2)
+        self.canvas = ctk.CTkLabel(self, text=None, fg_color='gray', image=self.title_image); self.canvas.place(relx=0.4, rely=0.2)
 
         self.img.close()
 
 
-        self.pan_button_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'black', bg_color = 'black'); self.pan_button_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
+        self.pan_button_frame = ctk.CTkFrame(self, width=self._current_width, height=100, fg_color = 'black', bg_color = 'black'); self.pan_button_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
         self.pan_status_frame = ctk.CTkFrame(self, width = self._current_width, height = 100, fg_color = 'dark orange', border_color = 'black', border_width = 10); self.pan_status_frame.pack(side = tk.BOTTOM, fill = tk.BOTH, expand = False)
 
@@ -98,7 +108,14 @@ class App(ctk.CTk):
 
         self.button_show_playlist = ctk.CTkButton(self, text = None, width = 50, height = 50, image = self.photo_show_playlist, command = self.show_playlist)
 
-        self.button_add_to_playlist = ctk.CTkButton(self.pan_playlist, text = 'ADD', command = self.add_to_playlist); self.button_add_to_playlist.pack()
+        self.button_download_tracks = ctk.CTkButton(self.pan_playlist, text="Download tracks", text_color="black", image=self.photo_download_tracks, command=self.download_tracks_and_add_to_playlist)
+        self.button_download_tracks.place(relx=0.3, rely=0.9)
+
+        self.button_add_to_playlist = ctk.CTkButton(self.pan_playlist, text="Add tracks", text_color="black", image=self.photo_add_track_to_playlist, command=self.add_to_playlist)
+        self.button_add_to_playlist.pack()
+
+        self.button_clear_playlist = ctk.CTkButton(self.pan_playlist, width=50, height=50, text="Clear playlist", text_color="black", image=self.photo_clear_playlist, command=self.clear_playlist)
+        self.button_clear_playlist.place(relx=0.3, rely=0.095)
 
         self.filename_label = ctk.CTkLabel(self.pan_status_frame, text = 'Waiting for opening file', text_color = 'black', font = self.ms_gothic_font)
         self.filename_label.place(relx = 0.4, rely = 0.1)
@@ -159,6 +176,7 @@ class App(ctk.CTk):
 
         self.settings_button = ctk.CTkButton(self, width = 50, height = 50, text = None, 
                                              image = self.photo_settings_button, command = self.settings_click_event)
+
         self.settings_button.place(relx = 0.01, rely = 0.01)
 
         self.progressbar = ctk.CTkProgressBar(self.pan_status_frame, mode = "indeterminate")
@@ -166,42 +184,14 @@ class App(ctk.CTk):
         self.playlist = CTkListbox(self.pan_playlist, width = 300, height = 400, bg_color = 'black', command = self.select_track)
         self.playlist.pack(side = 'right')
         
-        
-
 
 #----------------------------------------------------------------------------Playlist
 
-
-
     def add_to_playlist(self):
-        playlist_tuple_abspath = filedialog.askopenfilenames(title="open audiofile", filetypes=[("audio", "*.mp3"), ("audio", "*.wav")])
+        playlist_tuple_abspath = filedialog.askopenfilenames(title="open audiofile", initialdir="~/Музыка", filetypes=[("audio", "*.mp3"), ("audio", "*.wav")])
         playlist_to_add = list(playlist_tuple_abspath)
         step_value = 0
         index = 0
-
-
-        # if self.playlist_list.__len__() >= 1:       
-        #     if len(playlist_to_add) > len(self.playlist_list) : greater_list = playlist_to_add; smaller_list = self.playlist_list
-        #     else : greater_list = self.playlist_list; smaller_list = playlist_to_add
-
-        #     while step_value < smaller_list.__len__():
-        #         if greater_list[index] == smaller_list[step_value] : 
-        #            smaller_list[step_value] = 0
-        #         if index < len(greater_list) - 1:
-        #             index += 1
-        #         else:
-        #             step_value += 1
-        #             index = 0
-
-
-        #     index = 0
-            
-        #     playlist_to_add = smaller_list
-
-        #     while 0 in playlist_to_add : playlist_to_add.remove(0)
-            
-                
-        # index = 0
 
         while index < playlist_to_add.__len__(): 
             self.playlist_list.append(playlist_to_add[index])                                                       #Добавление в глобальный список с треками
@@ -214,6 +204,10 @@ class App(ctk.CTk):
             index += 1  
 
 
+    def clear_playlist(self):
+        self.playlist.delete(index=ALL)
+        self.playlist_list.clear()
+
     def hide_playlist(self):
         self.pan_playlist.pack_forget()
         self.button_show_playlist.place(relx = 0.95, rely = 0.01)
@@ -221,6 +215,17 @@ class App(ctk.CTk):
     def show_playlist(self):
         self.pan_playlist.pack(side = tk.RIGHT, fill = Y)
         self.button_show_playlist.place_forget()
+
+    def download_tracks_and_add_to_playlist(self):
+        # downloader_thread = threading.Thread(target=music_downloader.download_tracks, daemon=True)
+        # downloader_thread.start()
+        # downloader_thread.join()
+        # del downloader_thread
+        # print(threading.enumerate())
+        self.playlist_list = music_downloader.download_tracks()
+        # self.filename_label.configure(text = music_downloader.download_tracks.download_status)    
+        for index, track in enumerate(self.playlist_list):
+            self.playlist.insert(index, os.path.basename(self.playlist_list[index]))
 
 
     
@@ -425,7 +430,7 @@ class App(ctk.CTk):
 
 
     def open_file(self):
-        self._filepath_ = filedialog.askopenfilename(title="open audiofile", filetypes=[("audio", "*.mp3"), ("audio", "*.wav"), ("All files", "*.*")])
+        self._filepath_ = filedialog.askopenfilename(title="open audiofile", initialdir="~/Музыка", filetypes=[("audio", "*.mp3"), ("audio", "*.wav"), ("All files", "*.*")])
         if self._filepath_ != '' : 
             self.magic_button_pressed = False
             self.is_path_valid = True
@@ -516,6 +521,7 @@ class App(ctk.CTk):
             # so that regular playback programs will work right. They often only
             # know how to play audio at standard frame rate (like 44.1k)
             try:
+                if not os.path.isdir("tmp"): Path("tmp/").mkdir(parents=True, exist_ok=True)
                 sound_with_altered_frame_rate.export('tmp/tmp_audiofile.mp3', format = 'mp3')
                 self.magic_button_pressed = True
                 self.progressbar.place_forget()
