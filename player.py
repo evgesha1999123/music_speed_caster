@@ -2,60 +2,28 @@ import os
 import tkinter as tk
 from tkinter import *
 from tkinter import filedialog
-from typing import Optional, Tuple, Union
-import tkinter.messagebox as mb
 import customtkinter as ctk
-from PIL import Image, ImageTk
 import pygame
 from pygame import mixer
-import pydub
 from pydub import AudioSegment
-from pydub.playback import play
 import threading
-import sys
 import re
 import time
-from mutagen.mp3 import MP3
 from CTkListbox import *
 import eyed3
 from pathlib import Path
 import music_downloader
 import asyncio
 
+from utils import Utils
+from settings_window import SettingsWindow
 
 # Set the theme and color options
 ctk.set_appearance_mode("dark")  # Modes: system (default), light, dark
 ctk.set_default_color_theme("dark-blue")  # Themes: blue (default), dark-blue, green
-AUDIO_ALLOW_ANY_CHANGE:int
 
-is_path_valid = False
 
 class App(ctk.CTk):
-    def get_photo_image_from_source_file(
-        self, 
-        source:Union[str, Path],
-        size:Optional[Tuple[int, int]]=None
-        ) -> ImageTk.PhotoImage | None:
-        """""""""""""""""""""""""""""""""""""""""""""""""""
-        Загружает изображение с опциональным ресайзом.
-        Args:
-            source: Путь к файлу с изображением , ИЛИ переменная окружения с путем к файлу
-            size: None - без ресайза, (width, height) - с ресайзом
-        Returns:
-            PhotoImage объект
-        """""""""""""""""""""""""""""""""""""""""""""""""""
-        if isinstance(source, Path) or os.path.exists(source):
-            image_path = str(source)
-        else:
-            image_path = os.getenv(source)
-            if not image_path:
-                return None
-
-        _image = Image.open(image_path)
-        if size:
-            _image.resize(size)
-        return ImageTk.PhotoImage(_image)
-
 
     def __init__(self):
         super().__init__()
@@ -66,7 +34,6 @@ class App(ctk.CTk):
 
         self._filepath_ = ''
         self.current_song = None
-        self.is_path_valid = False
         self.first_file_start = True
         self.song_length = 0
         self.current_slider_pos = 0
@@ -87,22 +54,22 @@ class App(ctk.CTk):
 
         self.ms_gothic_font = ctk.CTkFont(family = "@MS Gothic", size = 14)
 
-        self.photo_open_file = self.get_photo_image_from_source_file("ICON_OPEN_FILE")
-        self.photo_play_button = self.get_photo_image_from_source_file("ICON_PLAY")
-        self.photo_stop_button = self.get_photo_image_from_source_file("ICON_STOP")
-        self.photo_pause_button = self.get_photo_image_from_source_file("ICON_PAUSE")
-        self.photo_change_speed_button = self.get_photo_image_from_source_file("ICON_MAGIC")
-        self.photo_settings_button = self.get_photo_image_from_source_file("ICON_SETTINGS")
-        self.photo_next_track = self.get_photo_image_from_source_file("ICON_NEXT_TRACK")
-        self.photo_previous_track = self.get_photo_image_from_source_file("ICON_PREVIOUS_TRACK")
-        self.photo_rewind_forward = self.get_photo_image_from_source_file("ICON_REWIND_FORWARD")
-        self.photo_rewind_back = self.get_photo_image_from_source_file("ICON_REWIND_BACK")
-        self.photo_show_playlist = self.get_photo_image_from_source_file("ICON_SHOW_PLAYLIST")
-        self.photo_hide_playlist = self.get_photo_image_from_source_file("ICON_HIDE_PLAYLIST")
-        self.photo_add_track_to_playlist = self.get_photo_image_from_source_file("ICON_ADD_TRACK_TO_PLAYLIST")
-        self.photo_clear_playlist = self.get_photo_image_from_source_file("ICON_CLEAR_PLAYLIST")
-        self.photo_download_tracks = self.get_photo_image_from_source_file("ICON_DOWNLOAD")
-        self.photo_album_cover = self.get_photo_image_from_source_file("ICON_UNKNOWN_ALBUM")
+        self.photo_open_file = Utils.get_photo_image_from_source_file("ICON_OPEN_FILE")
+        self.photo_play_button = Utils.get_photo_image_from_source_file("ICON_PLAY")
+        self.photo_stop_button = Utils.get_photo_image_from_source_file("ICON_STOP")
+        self.photo_pause_button = Utils.get_photo_image_from_source_file("ICON_PAUSE")
+        self.photo_change_speed_button = Utils.get_photo_image_from_source_file("ICON_MAGIC")
+        self.photo_settings_button = Utils.get_photo_image_from_source_file("ICON_SETTINGS")
+        self.photo_next_track = Utils.get_photo_image_from_source_file("ICON_NEXT_TRACK")
+        self.photo_previous_track = Utils.get_photo_image_from_source_file("ICON_PREVIOUS_TRACK")
+        self.photo_rewind_forward = Utils.get_photo_image_from_source_file("ICON_REWIND_FORWARD")
+        self.photo_rewind_back = Utils.get_photo_image_from_source_file("ICON_REWIND_BACK")
+        self.photo_show_playlist = Utils.get_photo_image_from_source_file("ICON_SHOW_PLAYLIST")
+        self.photo_hide_playlist = Utils.get_photo_image_from_source_file("ICON_HIDE_PLAYLIST")
+        self.photo_add_track_to_playlist = Utils.get_photo_image_from_source_file("ICON_ADD_TRACK_TO_PLAYLIST")
+        self.photo_clear_playlist = Utils.get_photo_image_from_source_file("ICON_CLEAR_PLAYLIST")
+        self.photo_download_tracks = Utils.get_photo_image_from_source_file("ICON_DOWNLOAD")
+        self.photo_album_cover = Utils.get_photo_image_from_source_file("ICON_UNKNOWN_ALBUM")
 
         self.album_box = ctk.CTkLabel(self, text=None, fg_color='gray', image=self.photo_album_cover, width=1, height=1); self.album_box.place(relx=0.4, rely=0.2)
 
@@ -126,9 +93,8 @@ class App(ctk.CTk):
         self.filename_label.place(relx = 0.4, rely = 0.1)
 
         self.song_lenght_label = ctk.CTkLabel(self.pan_status_frame, text_color = 'black', font = self.ms_gothic_font)
-        self.open_file_button = ctk.CTkButton(self.pan_button_frame, text="Open", font = self.ms_gothic_font, text_color = 'black', width = 50, height = 50, image = self.photo_open_file, command=self.open_file)
-        self.open_file_button.place(relx = 0.88, rely = 0.35, anchor = W)
-        self.pause_and_play_button = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50,image = self.photo_play_button, command = self.pause_and_play_button_click_event)
+
+        self.pause_and_play_button = ctk.CTkButton(self.pan_button_frame, text=None, width = 50, height=50, image=self.photo_play_button, command = self.pause_and_play_button_click_event)
         self.pause_and_play_button.place(relx = 0.35, rely = 0.35, anchor = W)
         self.stop_button = ctk.CTkButton(self.pan_button_frame, text = None, width = 50, height = 50, image = self.photo_stop_button, command = self.stop_music)
         self.stop_button.place(relx = 0.55, rely = 0.35, anchor = W)
@@ -164,6 +130,8 @@ class App(ctk.CTk):
         self.playlist = CTkListbox(self.pan_playlist, width = 300, height = 400, bg_color = 'black', command = self.select_track)
         self.playlist.pack(side = 'right')
 
+        #self.settings_window = None
+
         #self._enable_mousewheel_scroll()
 
     # def _enable_mousewheel_scroll(self):
@@ -186,15 +154,16 @@ class App(ctk.CTk):
 
 #----------------------------------------------------------------------------Playlist
 
+
     def _validate_filepath(self):
         if self._filepath_ in {"", None}:
             return False
         else: return True
 
+
     def add_to_playlist(self):
-        playlist_tuple_abspath = filedialog.askopenfilenames(title="open audiofile", initialdir="~/Музыка", filetypes=[("audio", "*.mp3"), ("audio", "*.wav")])
+        playlist_tuple_abspath = filedialog.askopenfilenames(title="open audiofile", initialdir=os.getenv("SELECT_TRACK_INITIALDIR"), filetypes=[("audio", "*.mp3"), ("audio", "*.wav")])
         playlist_to_add = list(playlist_tuple_abspath)
-        step_value = 0
         index = 0
 
         while index < playlist_to_add.__len__(): 
@@ -207,18 +176,22 @@ class App(ctk.CTk):
             self.playlist.insert(index, os.path.basename(self.playlist_list[index]))                                #Добавление в плейлист
             index += 1  
 
+
     def clear_playlist(self):
         print(f">>>>>>>>>>>>>>>>{self.playlist.curselection()}")
         self.playlist.delete(index=ALL)
         self.playlist_list.clear()
 
+
     def hide_playlist(self):
         self.pan_playlist.pack_forget()
         self.button_show_playlist.place(relx = 0.95, rely = 0.01)
 
+
     def show_playlist(self):
         self.pan_playlist.pack(side = tk.RIGHT, fill = Y)
         self.button_show_playlist.place_forget()
+
 
     def download_tracks_and_add_to_playlist(self):
         """Запускает загрузку треков в фоновом потоке"""
@@ -236,20 +209,21 @@ class App(ctk.CTk):
         # Запускаем в отдельном потоке
         threading.Thread(target=download_in_thread, daemon=True).start()
 
+
     def _update_playlist_item(self, track_path):
         """Добавляет один трек в плейлист"""
         track_name = os.path.basename(track_path)
         self.playlist.insert(tk.END, track_name)
         self.playlist_list.append(track_path)
     
+
     def select_track(self, selected_track):
         print(f'{selected_track} {[self.playlist.curselection()]} {self.playlist_list[self.playlist.curselection()]}')
         self.magic_button_pressed = False
-        self.is_path_valid = True
         self.first_file_start = True
         self._filepath_ = self.playlist_list[self.playlist.curselection()]
 
-        if mixer.music.get_busy() == True : self.stop_music()
+        if mixer.music.get_busy(): self.stop_music()
 
         self.parse_album_cover_photo_from_file()
 
@@ -271,11 +245,11 @@ class App(ctk.CTk):
 
 
     def next_or_previous_track_click_event(self, offset):
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+        """
         Бай дефолт CTkListBox, при условии, если выбран первый элемент, 
         и мы хотим переключиться на предыдущий, то он будет свитчиться 
         в конец списка, поэтому обрабатывать этот случай не нужно.
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+        """
         playlist_length = len(self.playlist_list) - 1
         current_playlist_selection = self.playlist.curselection()
         first_playlist_element = 0
@@ -308,7 +282,7 @@ class App(ctk.CTk):
             
             # Если файл уже существует - загружаем его
             if os.path.exists(source_image_path):
-                self.photo_album_cover = self.get_photo_image_from_source_file(source_image_path)
+                self.photo_album_cover = Utils.get_photo_image_from_source_file(source_image_path)
             else:
                 # Если файла нет - сохраняем обложку из тегов
                 if audio_file.tag.images:
@@ -316,112 +290,26 @@ class App(ctk.CTk):
                     with open(source_image_path, "wb") as f:
                         f.write(image.image_data)
                     print(f"Обложка сохранена в кэш: {source_image_path}")
-                    self.photo_album_cover = self.get_photo_image_from_source_file(source_image_path)
+                    self.photo_album_cover = Utils.get_photo_image_from_source_file(source_image_path)
                 else:
                     raise Exception("No album art in tags")
                     
         except Exception as e:
             print(f"Ошибка загрузки обложки: {e}")
             # Загружаем обложку по умолчанию
-            self.photo_album_cover = self.get_photo_image_from_source_file(
+            self.photo_album_cover = Utils.get_photo_image_from_source_file(
                 os.getenv("ICON_UNKNOWN_ALBUM")
             )
     
         self.album_box.configure(image=self.photo_album_cover)
 
 
-    def to_number(self, value):
-        if re.match("^\d+?\.\d+?$", value) is None:
-            return value.isdigit()
-        return True
-
 #-------------------------------------------------------------------------------- Settings Window
 
-
-
     def settings_click_event(self):
-        self.settings_button.configure(state = 'disabled')
-
-
-        self.settings_window = ctk.CTkToplevel(self)
-        self.settings_window.attributes("-topmost", True)
-        self.settings_window.title('Настройки')
-        self.settings_window.geometry('600x300')
-
-        self.settings_window.protocol("WM_DELETE_WINDOW", self.enable_settings_button)
-
-        self.entry_speed_multiplier = ctk.CTkEntry(self.settings_window, width = 50); self.entry_speed_multiplier.pack()
-        self.entry_speed_multiplier.place(relx = 0.7, rely = 0.2)
-        self.entry_speed_multiplier.bind('<Return>', self.parse_speed_player_value)
-
-        self.button_cancel = ctk.CTkButton(self.settings_window, text = 'Отмена', command = self.enable_settings_button); self.button_cancel.pack()
-        self.button_cancel.place(relx = 0.15, rely = 0.9, anchor = S)
-
-        self.button_save_config = ctk.CTkButton(self.settings_window, text = 'Применить', command = self.button_save_config_event); self.button_save_config.pack()
-        self.button_save_config.place(relx = 0.85, rely = 0.9, anchor = S)
-
-        self.settings_slider_set_track_speed = ctk.CTkSlider(self.settings_window, from_ = 0.1, to = 3); self.settings_slider_set_track_speed.pack()
-        self.settings_slider_set_track_speed.place(relx = 0.3, rely = 0.3) 
-        self.settings_slider_set_track_speed.set(0.8)
-
-        self.settings_slider_set_track_speed.bind('<ButtonRelease-1>', self.slider_set_track_speed_event)
-
-        self.settings_slider_set_track_speed_info_label = ctk.CTkLabel(self.settings_window, text = 'Значение скорости воспроизведения:')
-        self.settings_slider_set_track_speed_info_label.pack()
-        self.settings_slider_set_track_speed_info_label.place(relx = 0.3, rely = 0.2)
-
-        self.speed_multiplier_label_value = ctk.CTkLabel(self.settings_window, text = self.speed_multiplier); self.speed_multiplier_label_value.pack()
-        self.speed_multiplier_label_value.place(relx = 0.3, rely = 0.37)
-
-
-
-    def enable_settings_button(self):
-        self.settings_button.configure(state = 'normal')
-        self.settings_window.destroy()
-
-
-
-    def button_save_config_event(self):
-        self.speed_multiplier = self.speed_multiplier_label_value._text #<---set global value
-        if self.entry_speed_multiplier.get() != None and self.entry_speed_multiplier.get() != '' and self.to_number(self.entry_speed_multiplier.get()) == True and (float(self.entry_speed_multiplier.get()) > 0.1 and float(self.entry_speed_multiplier.get()) <= 4):
-            self.speed_multiplier = float(self.entry_speed_multiplier.get())
-            print(self.speed_multiplier)
-            self.settings_button.configure(state = 'normal')
-            self.change_speed_button.configure(state = 'normal')
-            self.init_speed_changer_thread()
-            self.settings_window.destroy()
-        else : 
-            self.entry_speed_multiplier.configure(border_color = 'red')
-            return
-
-
-
-    def slider_set_track_speed_event(self, event):
-        self.entry_speed_multiplier.configure(border_color = 'gray')
-        speed_multiplier_value = self.settings_slider_set_track_speed.get()
-        speed_multiplier_value = round(speed_multiplier_value, 2)
-        self.speed_multiplier_label_value.configure(text = speed_multiplier_value)
-
-        self.entry_speed_multiplier.delete(0, 'end')
-        self.entry_speed_multiplier.insert(1, self.speed_multiplier_label_value._text)
-
-
-
-    def parse_speed_player_value(self, event):
-        is_number = self.to_number(self.entry_speed_multiplier.get())
-        if is_number == True : float_entry_speed_multiplier_value = float(self.entry_speed_multiplier.get())
-        else :
-            self.entry_speed_multiplier.configure(border_color = 'red')
-            return
-
-        if float_entry_speed_multiplier_value >= 0.1 and float_entry_speed_multiplier_value <= 3:
-            self.entry_speed_multiplier.configure(border_color = 'gray')
-            self.speed_multiplier_label_value.configure(text = float_entry_speed_multiplier_value)
-            self.settings_slider_set_track_speed.set(float_entry_speed_multiplier_value)
-        else :
-            self.entry_speed_multiplier.configure(border_color = 'red')
-            return
-
+        self.settings_button.configure(state='disabled')
+        # Создаем окно настроек только при клике
+        SettingsWindow(self)
 #------------------------------------------------------------------------------------------- 
 
     def _validate_rewind_state(self):
@@ -431,19 +319,20 @@ class App(ctk.CTk):
             return False
         return True
 
+
     def rewind_forward_or_back_click_event(self, rewind_value:int):
-        is_rewind_forward = rewind_value > 0
         if self._validate_rewind_state():
             self.current_time = self.time_slider.get()
             mixer.music.play(loops=0, start=rewind_value + rewind_value)
 
+
     def rewind_forward_click_event(self):
-        print(type(self.time_slider.get()))
         self.current_time = int(self.time_slider.get())
         if self.current_time >= self.song_length or self.is_stop == True or self.is_pause == True : return
         else :
             mixer.music.play(loops = 0, start = int(self.time_slider.get()) + 1)
             self.current_time += 3
+
 
     def rewind_back_click_event(self):
         self.current_time = int(self.time_slider.get())
@@ -457,29 +346,6 @@ class App(ctk.CTk):
                 mixer.music.play(loops = 0, start = int(self.time_slider.get()) - 3)
                 self.current_time -= 3
 
-    def open_file(self):
-        self._filepath_ = filedialog.askopenfilename(title="open audiofile", initialdir="~/Музыка", filetypes=[("audio", "*.mp3"), ("audio", "*.wav"), ("All files", "*.*")])
-        if self._validate_filepath(): 
-            self.magic_button_pressed = False
-            self.is_path_valid = True
-            self.first_file_start = True
-            filename = os.path.basename(self._filepath_)
-            self.current_song = mixer.Sound(self._filepath_)
-            print(self._filepath_)
-            self.filename_label.configure(text = f'Now playing : {filename}')
-            self.song_length = mixer.Sound.get_length(self.current_song)
-            self.song_length = round(self.song_length, 1)
-
-            self.time_slider.pack()
-            self.time_slider.place(relx = 0.5, rely = 0.5, anchor = CENTER)
-            self.time_slider.configure(from_ = 0, to = self.song_length)
-            self.time_slider.set(0)
-            self.song_lenght_label.configure(text = f'{self.zero_time_text} / {self.zero_time_text}')
-            self.song_lenght_label.pack()
-            self.song_lenght_label.place(relx = 0.48, rely = 0.55)
-            self.change_speed_button.configure(state = 'normal')
-
-            self.stop_music()
 
     def stop_music(self):
         if self._validate_filepath(): 
@@ -491,17 +357,18 @@ class App(ctk.CTk):
             self.current_time = 0
             self.time_slider.set(0)
 
+
     def pause_and_play_button_click_event(self):
-        if self.magic_button_pressed == True:
-            if self.first_file_start == True:
-                self._filepath_ = 'tmp/tmp_audiofile.mp3'
+        if self.magic_button_pressed:
+            if self.first_file_start:
+                self._filepath_ = os.getenv("ALT_SPEED_CACHE_FILE")
                 self.current_song = mixer.Sound(self._filepath_)
                 self.song_length = mixer.Sound.get_length(self.current_song)
                 self.song_length = round(self.song_length, 1)
                 self.time_slider.configure(from_ = 0, to = self.song_length)
 
-        if self.first_file_start == True:
-            if self.is_path_valid == True:
+        if self.first_file_start:
+            if self._validate_filepath():
                 self.is_stop = False
                 self.is_pause = False
                 self.first_file_start = False
@@ -510,12 +377,12 @@ class App(ctk.CTk):
                 self.pause_and_play_button.configure(image = self.photo_pause_button)
                 self.watch_track_progress()
         else: 
-            if self.is_pause == False:
+            if not self.is_pause:
                 mixer.music.pause()
                 self.pause_and_play_button.configure(image = self.photo_play_button)
                 self.is_pause = True
                 
-            elif self.is_pause == True:
+            elif self.is_pause:
                 mixer.music.unpause()
                 self.pause_and_play_button.configure(image = self.photo_pause_button)
                 self.is_pause = False
@@ -528,16 +395,35 @@ class App(ctk.CTk):
                 mixer.music.play(loops = 0, start = int(self.time_slider.get()))
                 self.current_time = int(self.time_slider.get())
         
-        
 
     def volume_slider_event(self, event):
         mixer.music.set_volume(self.volume_slider.get())
 
+    
+    def set_alter_speed_track(self, sound_with_altered_frame_rate:AudioSegment, force_mixer_reinit=False):
+        """
+        Принимает аудиосегмент с преобразованной скоростью воспроизведения
+        Флаг force_mixer_reinit - для обработки исключения PermissionError
+        """
+        if force_mixer_reinit: 
+            mixer.quit()
+        sound_with_altered_frame_rate.export(os.getenv("ALT_SPEED_CACHE_FILE"), format = 'mp3')
+        self.magic_button_pressed = True
+        self.progressbar.place_forget()
+        if force_mixer_reinit: 
+            mixer.init()
+        self.stop_music()
+        self.pause_and_play_button_click_event()
+
+
+
     def change_speed(self):
             self.change_speed_button.configure(state = 'disabled')
             n_song = AudioSegment.from_file(self.playlist_list[self.playlist.curselection()])
-            # Manually override the frame_rate. This tells the computer how many
-            # samples to play per second
+            """
+            Manually override the frame_rate. This tells the computer how many
+            samples to play per second
+            """
             sound_with_altered_frame_rate = n_song._spawn(n_song.raw_data, overrides={
                 "frame_rate": int(n_song.frame_rate * self.speed_multiplier)
             })
@@ -546,20 +432,11 @@ class App(ctk.CTk):
             # so that regular playback programs will work right. They often only
             # know how to play audio at standard frame rate (like 44.1k)
             try:
-                if not os.path.isdir("tmp"): Path("tmp/").mkdir(parents=True, exist_ok=True)
-                sound_with_altered_frame_rate.export('tmp/tmp_audiofile.mp3', format = 'mp3')
-                self.magic_button_pressed = True
-                self.progressbar.place_forget()
-                self.stop_music()
-                self.pause_and_play_button_click_event()
+                if not os.path.isdir(os.getenv("ALT_SPEED_CACHE_DIR")): 
+                    Path(os.getenv("ALT_SPEED_CACHE_DIR")).mkdir(parents=True, exist_ok=True)
+                self.set_alter_speed_track(sound_with_altered_frame_rate)
             except PermissionError:
-                mixer.quit()
-                sound_with_altered_frame_rate.export('tmp/tmp_audiofile.mp3', format = 'mp3')
-                self.magic_button_pressed = True
-                self.progressbar.place_forget()
-                mixer.init()
-                self.stop_music()
-                self.pause_and_play_button_click_event()
+                self.set_alter_speed_track(sound_with_altered_frame_rate, force_mixer_reinit=True)
 
     
     def init_speed_changer_thread(self):
@@ -569,19 +446,21 @@ class App(ctk.CTk):
             self.progressbar.place(relx = 0.8, rely = 0.2)
             self.progressbar.start()
 
-    def close_window_event(self):
+    @staticmethod
+    def close_window_event():
         try:
-            if os.listdir('tmp/') != '':
-                os.remove('tmp/tmp_audiofile.mp3')
+            if os.listdir(os.getenv("ALT_SPEED_CACHE_DIR")) != '':
+                os.remove(os.getenv("ALT_SPEED_CACHE_FILE"))
             app.destroy()
         except PermissionError:
             app.destroy()
         except FileNotFoundError:
             app.destroy()
 
+
     def watch_track_progress(self):
-        if self.is_stop == True : return
-        if self.is_pause == True : pass
+        if self.is_stop: return
+        if self.is_pause: pass
 
         player_time = mixer.music.get_pos() / 1000
 

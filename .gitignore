@@ -5,3 +5,5 @@ venv/
 .gitignore
 auth.py
 .album_covers_cache/
+.tmp/
+TODO.txt
