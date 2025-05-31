@@ -1,8 +1,9 @@
 import os
+import random
 import tkinter as tk
 from tkinter import *
 from tkinter import filedialog
-from typing import Union, Literal
+from typing import Literal
 
 import customtkinter as ctk
 import pygame
@@ -14,18 +15,24 @@ from CTkListbox import *
 import eyed3
 from pathlib import Path
 
-from pygame.cursors import thickarrow_strings
-
 import music_downloader
 import asyncio
 
 from utils import Utils
 from settings_window import SettingsWindow
+from utils.platforms import osinfo
 
 # Set the theme and color options
 ctk.set_appearance_mode("dark")  # Modes: system (default), light, dark
 ctk.set_default_color_theme("dark-blue")  # Themes: blue (default), dark-blue, green
 
+OS = osinfo()
+
+if OS["system"] == "Linux":
+    os.environ['TK_SILENCE_DEPRECATION'] = '1'
+    os.environ['XDG_SESSION_TYPE'] = 'x11'  # Принудительно X11 вместо Wayland
+    os.environ["__GL_SYNC_TO_VBLANK"] = "1"  # Синхронизация с вертикальной разверткой
+    os.environ["__GL_YIELD"] = "USLEEP"  # Оптимизация рендеринга
 
 class App(ctk.CTk):
 
@@ -35,6 +42,7 @@ class App(ctk.CTk):
         self.title('Music speed caster')
         self.geometry("1300x800")
         self.minsize(782, 800)
+        self.resizing = False
 
         self._filepath_ = ''
         self.current_song = None
@@ -48,6 +56,7 @@ class App(ctk.CTk):
         self.current_time = 0
         self.zero_time_text = "00:00"
 
+        self.player_mode = "NORMAL"
         self.playlist_list = []
         self.next_track_index_offset = 1
         self.previous_track_index_offset = -1
@@ -74,10 +83,12 @@ class App(ctk.CTk):
         self.photo_album_cover = Utils.get_photo_image_from_source_file("ICON_UNKNOWN_ALBUM")
         self.photo_shuffle_tracks = Utils.get_photo_image_from_source_file("ICON_SHUFFLE_TRACKS")
         self.photo_repeat_tracks = Utils.get_photo_image_from_source_file("ICON_REPEAT_TRACKS")
+        self.photo_repeat_tracks_enabled = Utils.get_photo_image_from_source_file("ICON_REPEAT_TRACKS_ENABLED")
         self.photo_muted = Utils.get_photo_image_from_source_file("ICON_MUTED")
         self.photo_volume_min = Utils.get_photo_image_from_source_file("ICON_VOLUME_MIN")
         self.photo_volume_normal = Utils.get_photo_image_from_source_file("ICON_VOLUME_NORMAL")
         self.photo_volume_max = Utils.get_photo_image_from_source_file("ICON_VOLUME_MAX")
+        self.photo_normal_mode = Utils.get_photo_image_from_source_file("ICON_NORMAL_MODE")
 
         self.album_box = ctk.CTkLabel(self, text="", fg_color='gray', image=self.photo_album_cover)
         self.album_box.place(relx=0.4, rely=0.2)
@@ -96,14 +107,14 @@ class App(ctk.CTk):
 
         self.button_show_playlist = ctk.CTkButton(self, text="", width=50, height=50, image=self.photo_show_playlist, command=self.show_playlist)
 
-        self.button_download_tracks = ctk.CTkButton(self.pan_playlist, text="Download tracks", text_color="black", image=self.photo_download_tracks, command=self.download_tracks_and_add_to_playlist)
-        self.button_download_tracks.place(relx=0.3, rely=0.9)
+        self.button_download_tracks = ctk.CTkButton(self.pan_playlist, text="", text_color="black", width=50, height=50, image=self.photo_download_tracks, command=self.download_tracks_and_add_to_playlist)
+        self.button_download_tracks.place(relx=0.1, rely=0.9)
 
-        self.button_add_to_playlist = ctk.CTkButton(self.pan_playlist, text="Add tracks", text_color="black", image=self.photo_add_track_to_playlist, command=self.add_to_playlist)
-        self.button_add_to_playlist.pack()
+        self.button_add_to_playlist = ctk.CTkButton(self.pan_playlist, text="", width=50, height=50, text_color="black", image=self.photo_add_track_to_playlist, command=self.add_to_playlist)
+        self.button_add_to_playlist.place(relx=0.3, rely=0.9)
 
-        self.button_clear_playlist = ctk.CTkButton(self.pan_playlist, width=50, height=50, text="Clear playlist", text_color="black", image=self.photo_clear_playlist, command=self.clear_playlist)
-        self.button_clear_playlist.place(relx=0.3, rely=0.095)
+        self.button_clear_playlist = ctk.CTkButton(self.pan_playlist, width=50, height=50, text="", text_color="black", image=self.photo_clear_playlist, command=self.clear_playlist)
+        self.button_clear_playlist.place(relx=0.5, rely=0.9)
 
         self.filename_label = ctk.CTkLabel(self.pan_status_frame, text='Waiting for opening file', text_color='black', font=self.ms_gothic_font, width=self.winfo_width()*0.9)
         self.filename_label.place(relx=0.1, rely=0.1)
@@ -131,11 +142,8 @@ class App(ctk.CTk):
         self.change_speed_button = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_change_speed_button, command=self.init_speed_changer_thread)
         self.change_speed_button.place(x=370, y=40, anchor=W)
 
-        self.button_shuffle_tracks = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_shuffle_tracks)
-        self.button_shuffle_tracks.place(x=430, y=40, anchor=W)
-
-        self.button_repeat_tracks = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_repeat_tracks)
-        self.button_repeat_tracks.place(x=490, y=40, anchor=W)
+        self.button_switch_player_mode = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_normal_mode, command=self.on_switch_player_mode)
+        self.button_switch_player_mode.place(x=430, y=40, anchor=W)
 
         self.time_slider = ctk.CTkSlider(self.pan_status_frame, from_=0, to=self.song_length, width=self.winfo_width() * 0.9, height=20, progress_color='DodgerBlue4')
         self.time_slider.bind("<ButtonRelease-1>", self.time_slider_event_release)
@@ -156,35 +164,30 @@ class App(ctk.CTk):
         self.playlist = CTkListbox(self.pan_playlist, width=300, height=400, bg_color='black', command=self.select_track)
         self.playlist.pack(side='right')
 
+        if OS["system"] == "Linux":
+            self.playlist.bind_all("<Button-4>", lambda event: self.playlist._parent_canvas.yview("scroll", -1, "units"))
+            self.playlist.bind_all("<Button-5>", lambda event: self.playlist._parent_canvas.yview("scroll", 1, "units"))
+
         self.bind("<Configure>", self.on_window_resize)
+
+
+        #self.wm_attributes("-transparentcolor", "white")  # Устранение артефактов прозрачности
 
 
     def on_window_resize(self, event):
         print(f"{self.winfo_width()}x{self.winfo_height()}")
-        self.update_time_slider_width()
+        if not self.resizing:
+            self.resizing = True
+            self.wm_attributes("-topmost", 1)
+            self.after(200, self.update_layouts)
+
+    def update_layouts(self):
         #self.update_idletasks()
-
-        #self.settings_window = None
-
-        #self._enable_mousewheel_scroll()
-
-    # def _enable_mousewheel_scroll(self):
-    #     """Привязывает прокрутку колесиком мыши"""
-    #     # Для Windows и Linux
-    #     self.playlist.bind("<MouseWheel>", lambda e: self._on_mousewheel(e))
-        
-
-    # def _on_mousewheel(self, event, delta=None):
-    #     """Обработчик прокрутки колесика"""
-    #     if delta is None:
-    #         delta = -1 * (event.delta // 120)  # Нормализация для Windows
-        
-    #     # Прокрутка ListBox
-    #     self.playlist.yview_scroll(int(delta), "units")
-        
-    #     # Предотвращаем всплытие события
-    #     return "break"
-        
+        self.update_time_slider_width()
+        self.wm_attributes("-topmost", 0)
+        #self.tk.call('tk', 'scaling', 1.0)  # Сброс масштабирования
+        #self.update()
+        self.resizing = False
 
     def update_time_slider_width(self):
         new_time_slider_width = self.winfo_width() * 0.9
@@ -194,6 +197,67 @@ class App(ctk.CTk):
         new_volume_slider_width = self.winfo_width() * 0.01
         self.volume_slider.configure(width=new_volume_slider_width)
 #----------------------------------------------------------------------------Playlist
+
+
+    def on_switch_player_mode(self):
+        match self.player_mode:
+            case "NORMAL":
+                self.player_mode = "SHUFFLE"
+                self.button_switch_player_mode.configure(image=self.photo_shuffle_tracks)
+            case "SHUFFLE":
+                self.player_mode = "REPEAT"
+                self.button_switch_player_mode.configure(image=self.photo_repeat_tracks)
+            case "REPEAT":
+                self.player_mode = "NORMAL"
+                self.button_switch_player_mode.configure(image=self.photo_normal_mode)
+        print(self.player_mode)
+
+
+    def switch_track(self, next_index, repeat_track=False):
+        if repeat_track:
+            self.pause_and_play_button_click_event()
+            return
+        self._filepath_ = self.playlist_list[next_index]
+        self.playlist.activate(next_index)
+
+
+    def next_or_previous_track_click_event(self, offset):
+        """
+        Бай дефолт CTkListBox, при условии, если выбран первый элемент,
+        и мы хотим переключиться на предыдущий, то он будет свитчиться
+        в конец списка, поэтому обрабатывать этот случай не нужно.
+        """
+        playlist_length = len(self.playlist_list) - 1
+        current_playlist_selection = self.playlist.curselection()
+        first_playlist_element = 0
+        is_next_track = offset > 0
+        if current_playlist_selection is None: return
+        if not self._validate_filepath(): return
+        else:
+            if self.player_mode == "SHUFFLE":
+                self.switch_track(random.randint(0, playlist_length))
+            else:
+                if current_playlist_selection == playlist_length and is_next_track:
+                   self.switch_track(first_playlist_element)
+                else:
+                    self.switch_track(current_playlist_selection + offset)
+
+
+    def set_next_track_when_time_ends(self):
+        current_playlist_selection = self.playlist.curselection()
+        playlist_length = len(self.playlist_list) - 1
+        first_playlist_element = 0
+        match self.player_mode:
+            case "NORMAL":
+                if current_playlist_selection == playlist_length:
+                    self.switch_track(first_playlist_element)
+                else:
+                    self.switch_track(current_playlist_selection + 1)
+            case "SHUFFLE":
+                random_index = random.randint(0, playlist_length)
+                self.switch_track(random_index)
+            case "REPEAT":
+                self.switch_track(current_playlist_selection, repeat_track=True)
 
 
     def _validate_filepath(self):
@@ -283,27 +347,6 @@ class App(ctk.CTk):
         self.change_speed_button.configure(state = 'normal')
 
         self.pause_and_play_button_click_event()
-
-
-    def next_or_previous_track_click_event(self, offset):
-        """
-        Бай дефолт CTkListBox, при условии, если выбран первый элемент, 
-        и мы хотим переключиться на предыдущий, то он будет свитчиться 
-        в конец списка, поэтому обрабатывать этот случай не нужно.
-        """
-        playlist_length = len(self.playlist_list) - 1
-        current_playlist_selection = self.playlist.curselection()
-        first_playlist_element = 0
-        is_next_track = offset > 0
-        if current_playlist_selection is None: return
-        if not self._validate_filepath(): return
-        else:
-            if current_playlist_selection == playlist_length and is_next_track:
-                self._filepath_ = self.playlist_list[first_playlist_element]
-                self.playlist.activate(first_playlist_element)
-            else:
-                self._filepath_ = self.playlist_list[current_playlist_selection + offset]
-                self.playlist.activate(current_playlist_selection + offset)
 
     
     def parse_album_cover_photo_from_file(self):
@@ -492,31 +535,46 @@ class App(ctk.CTk):
 
 
     def watch_track_progress(self):
-        if self.is_stop: return
-        if self.is_pause: pass
-
-        player_time = mixer.music.get_pos() / 1000
-
-        if player_time < 0 : 
-            self.stop_music() 
+        if self.is_stop:
             return
 
-        current_time =  self.current_time + player_time
-        converted_current_time = time.strftime('%M:%S', time.gmtime(current_time))
-        converted_song_length = time.strftime('%M:%S', time.gmtime(self.song_length))
+        if not self.is_pause:
+            player_time = mixer.music.get_pos() / 1000
 
-        if int(current_time) >= int(self.song_length) : 
+            # Обработка случая, когда трек закончился
+            if player_time < 0:
+                # Добавляем небольшую задержку для уверенности, что трек действительно закончился
+                if hasattr(self, '_end_timer'):
+                    self.stop_music()
+                    print("END")
+                    self.set_next_track_when_time_ends()
+                    return
+                else:
+                    self._end_timer = True
+                    self.song_length_label.after(500, self.watch_track_progress)
+                    return
+            elif hasattr(self, '_end_timer'):
+                del self._end_timer
+
+            current_time = self.current_time + player_time
+            converted_current_time = time.strftime('%M:%S', time.gmtime(current_time))
+            converted_song_length = time.strftime('%M:%S', time.gmtime(self.song_length))
+
+            # Проверка окончания трека с небольшим допуском
+            if current_time >= self.song_length - 0.5:  # -0.5 секунды как допуск
                 string_timebar = f'{converted_song_length} / {converted_song_length}'
-                self.song_length_label.configure(text = string_timebar)
+                self.song_length_label.configure(text=string_timebar)
+                self.time_slider.set(int(self.song_length))
                 self.stop_music()
+                print("END")
+                self.set_next_track_when_time_ends()
                 return
-        
-        if current_time < self.song_length: 
-            current_time += 1
 
-        string_timebar = f'{converted_current_time} / {converted_song_length}'
-        self.time_slider.set(int(current_time))
-        self.song_length_label.configure(text = string_timebar)
+            # Обновление интерфейса
+            string_timebar = f'{converted_current_time} / {converted_song_length}'
+            self.time_slider.set(int(current_time))
+            self.song_length_label.configure(text=string_timebar)
+
         self.song_length_label.after(450, self.watch_track_progress)
 
                 
