@@ -2,14 +2,14 @@ import asyncio
 from os import getenv
 from pathlib import Path
 from typing import List, AsyncIterable
-from yandex_music import Client, ClientAsync
+from yandex_music import ClientAsync
 from dotenv import load_dotenv
 
 load_dotenv()
 
 YA_TOKEN = getenv("YA_TOKEN")
 DEFAULT_CACHE_FOLDER = Path(__file__).resolve().parent / '.YMcache'
-MAX_TRACKS = 20
+MAX_TRACKS = 200
 
 async def init_ym_client() -> ClientAsync:
     return await ClientAsync(token=YA_TOKEN, report_unknown_fields=False).init()
@@ -19,7 +19,7 @@ async def get_liked_tracks(client: ClientAsync, max_tracks: int = MAX_TRACKS) ->
     print(likes)
     return likes[:max_tracks]
 
-async def download_track(track_short, cache_folder: Path = DEFAULT_CACHE_FOLDER) -> Path:
+async def download_track(track_short, cache_folder: Path = DEFAULT_CACHE_FOLDER) -> Path | None:
     """Загружает один трек и возвращает путь к файлу"""
     try:
         track = track_short.track or await track_short.fetch_track_async()
@@ -40,7 +40,6 @@ async def download_track(track_short, cache_folder: Path = DEFAULT_CACHE_FOLDER)
         
     except Exception as e:
         print(f"Error downloading track: {e}")
-        return None
 
 async def track_downloader(max_tracks: int = MAX_TRACKS) -> AsyncIterable[Path]:
     """Асинхронный генератор загруженных треков"""
