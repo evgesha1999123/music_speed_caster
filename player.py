@@ -40,11 +40,13 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title('Music speed caster')
-        self.geometry("1300x800")
+        self.geometry("782x800")
         self.minsize(782, 800)
         self.resizing = False
+        self.last_window_width = self.winfo_width()
+        self.last_window_height = self.winfo_height()
 
-        self._filepath_ = ''
+        self._filepath_: Path | str = ''
         self.current_song = None
         self.first_file_start = True
         self.song_length = 0
@@ -57,6 +59,13 @@ class App(ctk.CTk):
         self.zero_time_text = "00:00"
 
         self.player_mode = "NORMAL"
+        self.playlist_state = "SHOW"
+        self.album_box_rely = 0.2
+        self.album_box_relx_closed_playlist = 0.45
+        self.album_box_relx_min_opened_playlist = 0.35
+        self.album_box_relx_max_opened_playlist = 0.15
+        self.min_win_width_for_playlist: int = 1024
+        self.muted = False
         self.playlist_list = []
         self.next_track_index_offset = 1
         self.previous_track_index_offset = -1
@@ -78,6 +87,7 @@ class App(ctk.CTk):
         self.photo_show_playlist = Utils.get_photo_image_from_source_file("ICON_SHOW_PLAYLIST")
         self.photo_hide_playlist = Utils.get_photo_image_from_source_file("ICON_HIDE_PLAYLIST")
         self.photo_add_track_to_playlist = Utils.get_photo_image_from_source_file("ICON_ADD_TRACK_TO_PLAYLIST")
+        self.photo_delete_track_from_playlist = Utils.get_photo_image_from_source_file("ICON_DELETE_TRACK")
         self.photo_clear_playlist = Utils.get_photo_image_from_source_file("ICON_CLEAR_PLAYLIST")
         self.photo_download_tracks = Utils.get_photo_image_from_source_file("ICON_DOWNLOAD")
         self.photo_album_cover = Utils.get_photo_image_from_source_file("ICON_UNKNOWN_ALBUM")
@@ -91,7 +101,7 @@ class App(ctk.CTk):
         self.photo_normal_mode = Utils.get_photo_image_from_source_file("ICON_NORMAL_MODE")
 
         self.album_box = ctk.CTkLabel(self, text="", fg_color='gray', image=self.photo_album_cover)
-        self.album_box.place(relx=0.4, rely=0.2)
+        self.album_box.place(relx=self.album_box_relx_closed_playlist, rely=self.album_box_rely)
 
         self.pan_button_frame = ctk.CTkFrame(self, width=self._current_width, height=100, fg_color='black', bg_color='black')
         self.pan_button_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=False)
@@ -113,8 +123,11 @@ class App(ctk.CTk):
         self.button_add_to_playlist = ctk.CTkButton(self.pan_playlist, text="", width=50, height=50, text_color="black", image=self.photo_add_track_to_playlist, command=self.add_to_playlist)
         self.button_add_to_playlist.place(relx=0.3, rely=0.9)
 
+        self.button_delete_track_from_playlist = ctk.CTkButton(self.pan_playlist, text="", width=50, height=50, image=self.photo_delete_track_from_playlist, command=self.on_delete_track_click)
+        self.button_delete_track_from_playlist.place(relx=0.5, rely=0.9)
+
         self.button_clear_playlist = ctk.CTkButton(self.pan_playlist, width=50, height=50, text="", text_color="black", image=self.photo_clear_playlist, command=self.clear_playlist)
-        self.button_clear_playlist.place(relx=0.5, rely=0.9)
+        self.button_clear_playlist.place(relx=0.7, rely=0.9)
 
         self.filename_label = ctk.CTkLabel(self.pan_status_frame, text='Waiting for opening file', text_color='black', font=self.ms_gothic_font, width=self.winfo_width()*0.9)
         self.filename_label.place(relx=0.1, rely=0.1)
@@ -150,10 +163,13 @@ class App(ctk.CTk):
 
         self.volume_slider = ctk.CTkSlider(self.pan_button_frame, from_=0, to=1, orientation="horizontal", progress_color='DodgerBlue4', width=150, height=20)
         self.volume_slider.place(relx=0.77, rely=0.4, anchor=W)
-        self.volume_slider.bind("<ButtonRelease-1>", self.volume_slider_event)
+
+        self.volume_slider.bind("<B1-Motion>", self.update_volume_drag)
+        self.volume_slider.bind("<ButtonRelease-1>", self.end_volume_drag)
+
         self.volume_slider.set(1)
 
-        self.volume_button = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_volume_max)
+        self.volume_button = ctk.CTkButton(self.pan_button_frame, text="", width=50, height=50, image=self.photo_volume_max, command=self.on_volume_button_click)
         self.volume_button.place(relx=0.7, rely=0.4, anchor=W)
 
         self.settings_button = ctk.CTkButton(self, width=50, height=50, text="", image=self.photo_settings_button, command=self.settings_click_event)
@@ -171,27 +187,68 @@ class App(ctk.CTk):
         self.bind("<Configure>", self.on_window_resize)
 
 
-        #self.wm_attributes("-transparentcolor", "white")  # Устранение артефактов прозрачности
-
-
     def on_window_resize(self, event):
-        print(f"{self.winfo_width()}x{self.winfo_height()}")
-        if not self.resizing:
-            self.resizing = True
-            self.wm_attributes("-topmost", 1)
-            self.after(200, self.update_layouts)
+        #print(f"{self.winfo_width()}x{self.winfo_height()}")
+        if event.widget != self: return
+        if event.width != self.last_window_width or event.height != self.last_window_height:
+            self.last_window_width = event.width
+            self.last_window_height = event.height
+
+            if not self.resizing:
+                self.resizing = True
+                if self.playlist_state == "HIDE":
+                    self.button_show_playlist.place_forget()
+                self.pan_playlist.pack_forget()
+                self.pan_button_frame.pack_forget()
+                self.pan_status_frame.pack_forget()
+                self.album_box.place_forget()
+                self.after(0, self.update_layouts)
+
 
     def update_layouts(self):
-        #self.update_idletasks()
         self.update_time_slider_width()
-        self.wm_attributes("-topmost", 0)
-        #self.tk.call('tk', 'scaling', 1.0)  # Сброс масштабирования
-        #self.update()
+        self.pan_button_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=False)
+        self.pan_status_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=False)
+        if self.playlist_state == "SHOW":
+            self.pan_playlist.pack(side=tk.RIGHT, fill=Y)
+            self.button_show_playlist.place_forget()
+        if self.playlist_state == "HIDE":
+            self.button_show_playlist.place(relx=0.9, rely=0.01)
+            self.adapt_album_box_widget()
+        self.adapt_album_box_widget()
         self.resizing = False
+
+
+    def adapt_album_box_widget(self):
+        if self.playlist_state == "SHOW":
+            if self.winfo_width() < self.min_win_width_for_playlist:
+                self.album_box.place(relx=self.album_box_relx_max_opened_playlist, rely=self.album_box_rely)
+            else:
+                self.album_box.place(relx=self.album_box_relx_min_opened_playlist, rely=self.album_box_rely)
+        else:
+            if self.winfo_width() < self.min_win_width_for_playlist:
+                self.album_box.place(relx=self.album_box_relx_min_opened_playlist, rely=self.album_box_rely)
+            else:
+                self.album_box.place(relx=self.album_box_relx_closed_playlist, rely=self.album_box_rely)
+
 
     def update_time_slider_width(self):
         new_time_slider_width = self.winfo_width() * 0.9
         self.time_slider.configure(width=new_time_slider_width)
+
+
+    def on_volume_button_click(self):
+        if not self.muted:
+            mixer.music.set_volume(0)
+            self.volume_slider.set(0)
+            self.volume_button.configure(image=self.photo_muted)
+            self.muted = True
+        else:
+            mixer.music.set_volume(1)
+            self.volume_slider.set(1)
+            self.volume_button.configure(image=self.photo_volume_max)
+            self.muted = False
+
 
     def update_volume_slider_width(self):
         new_volume_slider_width = self.winfo_width() * 0.01
@@ -210,7 +267,6 @@ class App(ctk.CTk):
             case "REPEAT":
                 self.player_mode = "NORMAL"
                 self.button_switch_player_mode.configure(image=self.photo_normal_mode)
-        print(self.player_mode)
 
 
     def switch_track(self, next_index, repeat_track=False):
@@ -282,6 +338,14 @@ class App(ctk.CTk):
             self.playlist.insert(index, os.path.basename(self.playlist_list[index])) #Добавление в плейлист
             index += 1
 
+    def on_delete_track_click(self):
+        if self.playlist.size() > 0:
+            if self.playlist.curselection() is not None:
+                self.playlist_list.pop(self.playlist.curselection())
+                self.playlist.delete(self.playlist.curselection())
+                self.stop_music()
+                self._filepath_ = ""
+
     def download_tracks_and_add_to_playlist(self):
         """Запускает загрузку треков в фоновом потоке"""
         def download_in_thread():
@@ -314,13 +378,20 @@ class App(ctk.CTk):
 
 
     def hide_playlist(self):
-        self.pan_playlist.pack_forget()
-        self.button_show_playlist.place(relx = 0.95, rely = 0.01)
+        if self.playlist_state == "SHOW":
+            self.pan_playlist.pack_forget()
+            #self.album_box.place(relx=self.album_box_relx_closed_playlist, rely=self.album_box_rely)
+            self.button_show_playlist.place(relx = 0.9, rely = 0.01)
+            self.playlist_state = "HIDE"
+            self.adapt_album_box_widget()
 
 
     def show_playlist(self):
-        self.pan_playlist.pack(side = tk.RIGHT, fill = Y)
-        self.button_show_playlist.place_forget()
+        if self.playlist_state == "HIDE":
+            self.pan_playlist.pack(side = tk.RIGHT, fill = Y)
+            self.button_show_playlist.place_forget()
+            self.playlist_state = "SHOW"
+            self.adapt_album_box_widget()
     
 
     def select_track(self, selected_track):
@@ -414,21 +485,21 @@ class App(ctk.CTk):
         if self.is_stop == True or self.is_pause == True or self.current_time <= 0: return
         else:
             if self.current_time <= 3 :
-                mixer.music.play(loops = 0, start = -self.time_slider.get())
+                mixer.music.play(loops=0, start=-self.time_slider.get())
                 self.time_slider.set(0)
-                self.song_length_label.configure(text =f'{self.zero_time_text} / {time.strftime('%M:%S', time.gmtime(self.song_length))}')
+                self.song_length_label.configure(text=f'{self.zero_time_text} / {time.strftime('%M:%S', time.gmtime(self.song_length))}')
             else:
-                mixer.music.play(loops = 0, start = int(self.time_slider.get()) - 3)
+                mixer.music.play(loops=0, start=int(self.time_slider.get()) - 3)
                 self.current_time -= 3
 
 
     def stop_music(self):
         if self._validate_filepath(): 
             mixer.music.stop()
-            self.pause_and_play_button.configure(image = self.photo_play_button)
+            self.pause_and_play_button.configure(image=self.photo_play_button)
             self.first_file_start = True
             self.is_stop = True
-            self.song_length_label.configure(text =f'{self.zero_time_text} / {self.zero_time_text}')
+            self.song_length_label.configure(text=f'{self.zero_time_text} / {self.zero_time_text}')
             self.current_time = 0
             self.time_slider.set(0)
 
@@ -440,7 +511,7 @@ class App(ctk.CTk):
                 self.current_song = mixer.Sound(self._filepath_)
                 self.song_length = mixer.Sound.get_length(self.current_song)
                 self.song_length = round(self.song_length, 1)
-                self.time_slider.configure(from_ = 0, to = self.song_length)
+                self.time_slider.configure(from_=0, to=self.song_length)
 
         if self.first_file_start:
             if self._validate_filepath():
@@ -449,17 +520,17 @@ class App(ctk.CTk):
                 self.first_file_start = False
                 mixer.music.load(self._filepath_)
                 mixer.music.play()
-                self.pause_and_play_button.configure(image = self.photo_pause_button)
+                self.pause_and_play_button.configure(image=self.photo_pause_button)
                 self.watch_track_progress()
         else: 
             if not self.is_pause:
                 mixer.music.pause()
-                self.pause_and_play_button.configure(image = self.photo_play_button)
+                self.pause_and_play_button.configure(image=self.photo_play_button)
                 self.is_pause = True
                 
             elif self.is_pause:
                 mixer.music.unpause()
-                self.pause_and_play_button.configure(image = self.photo_pause_button)
+                self.pause_and_play_button.configure(image=self.photo_pause_button)
                 self.is_pause = False
             
 
@@ -467,12 +538,25 @@ class App(ctk.CTk):
         if not self._validate_filepath(): return
         else :
             if self.is_pause != True and self.is_stop != True:
-                mixer.music.play(loops = 0, start = int(self.time_slider.get()))
+                mixer.music.play(loops=0, start=int(self.time_slider.get()))
                 self.current_time = int(self.time_slider.get())
-        
 
-    def volume_slider_event(self, event):
+    def update_volume_drag(self, event):
+        self.set_volume_and_change_icon()
+
+    def end_volume_drag(self, event):
+        self.set_volume_and_change_icon()
+
+    def set_volume_and_change_icon(self):
         mixer.music.set_volume(self.volume_slider.get())
+        if self.volume_slider.get() >= 0.6:
+            self.volume_button.configure(image=self.photo_volume_max)
+        if self.volume_slider.get() < 0.6 >= 0.3:
+            self.volume_button.configure(image=self.photo_volume_normal)
+        if self.volume_slider.get() < 0.3 > 0:
+            self.volume_button.configure(image=self.photo_volume_min)
+        if self.volume_slider.get() == 0:
+            self.volume_button.configure(image=self.photo_muted)
 
     
     def set_alter_speed_track(self, sound_with_altered_frame_rate:AudioSegment, force_mixer_reinit=False):
@@ -582,6 +666,7 @@ class App(ctk.CTk):
 # Define app and Create our app's mainloop
 if __name__ == "__main__":
     app = App()
+    app.update_idletasks()
     app.protocol("WM_DELETE_WINDOW", app.close_window_event)
     pygame.init()
     mixer.pre_init(frequency=44100, size = -16, channels=2, buffer=512, devicename=None, allowedchanges=0)
